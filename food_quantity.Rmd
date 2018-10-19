@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Load the dataset:
 
-```{r}
+```{r message=FALSE}
 library(data.table)
 library(reshape2)
 foodBalance <- fread("materials/FoodBalanceSheets_E_All_Data.csv")
@@ -33,6 +33,16 @@ itemCodes <- foodBalance[, .(`Item Code`, Item)][, .SD[1], by = .(`Item Code`)]
 # How to compute 'leaders'
 #itemCodes[grep("vegetables", itemCodes$Item, ignore.case = TRUE)]
 #vegetableLeaders <- foodBalance[`Item Code` == 2918, .(`Area Code`, Area, Y2013)][order(-Y2013)]
+
+foodBalance <- foodBalance[, .(`Area Code`, Area, `Item Code`, Item, Unit, Y2009, Y2010, Y2011, Y2012, Y2013)]
+setnames(foodBalance, old = c("Area Code", "Area", "Item Code", "Item", "Unit"),
+         new = c("areaCode", "area", "itemCode", "item", "unit"))
+
+foodBalance <- melt(foodBalance, id.vars = c("areaCode", "area", "itemCode", "item", "unit"), 
+                    measure.vars = c("Y2009", "Y2010", "Y2011", "Y2012", "Y2013"),
+                    variable.name = "year", value.name = "amount")
+
+foodBalance[, year := sapply(X = year, FUN = function(s) { regmatches(s, regexec("Y([0-9]{4})", s))[[1]][2] }, USE.NAMES = FALSE)]
 ```
 
 ```{r}

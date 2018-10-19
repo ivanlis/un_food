@@ -130,10 +130,61 @@ $(document).ready(function () {
 <h2>R Markdown</h2>
 <p>Load the dataset:</p>
 <pre class="r"><code>library(data.table)
-foodBalance &lt;- fread(&quot;FoodBalanceSheets_E_All_Data.csv&quot;)</code></pre>
+library(reshape2)
+foodBalance &lt;- fread(&quot;materials/FoodBalanceSheets_E_All_Data.csv&quot;)</code></pre>
 <p>We are only interested in the element called <em>“Food supply quantity (kg/capita/yr)”</em>. Also we need the data on separate countries rather than regions or groups of countries.</p>
 <pre class="r"><code>foodBalance &lt;- foodBalance[`Element Code` == 645 &amp; `Area Code` &lt; 1000]
-itemCodes &lt;- foodBalance[, .(`Item Code`, Item)][, .SD[1], by = .(`Item Code`)]</code></pre>
+itemCodes &lt;- foodBalance[, .(`Item Code`, Item)][, .SD[1], by = .(`Item Code`)]
+
+# How to compute 'leaders'
+#itemCodes[grep(&quot;vegetables&quot;, itemCodes$Item, ignore.case = TRUE)]
+#vegetableLeaders &lt;- foodBalance[`Item Code` == 2918, .(`Area Code`, Area, Y2013)][order(-Y2013)]</code></pre>
+<pre class="r"><code>gluc &lt;- fread(&quot;materials/NCD_GLUC_03.csv&quot;)
+
+# Reflect the year and sex in column names to further melt the data set
+for (i in 2:ncol(gluc))
+    names(gluc)[i] &lt;- sprintf(&quot;Y%d %s&quot;, as.integer(gluc[1, ..i]), trimws(gluc[4, ..i], &quot;both&quot;))
+
+# Remove unnecessary rows
+gluc &lt;- gluc[-(1:4)]
+
+gluc &lt;- melt(gluc, id.vars = c(&quot;V1&quot;), measure.vars = names(gluc)[2:ncol(gluc)], 
+             variable.name = &quot;yearSex&quot;, value.name = &quot;percentage&quot;)
+setnames(gluc, old = &quot;V1&quot;, new = &quot;country&quot;)
+
+gluc[, year := sapply(X = yearSex, FUN = function(s) { regmatches(s, regexec(&quot;Y([0-9]{4})&quot;, s))[[1]][2] }, USE.NAMES = FALSE)]
+gluc[, sex := sapply(X = yearSex, FUN = function(s) { 
+    regmatches(tolower(s), regexec(&quot;(male|female|both)&quot;, tolower(s)))[[1]][2] }, USE.NAMES = FALSE)]
+gluc[, yearSex := NULL]
+
+gluc &lt;- dcast.data.table(gluc, country + year ~ sex, value.var = &quot;percentage&quot;)
+
+#strsplit(gsub(&quot;[\\]\\[\\-]&quot;, &quot; &quot;, gluc[1, both], perl = TRUE), &quot;[ \t]+&quot;)[[1]]
+
+gluc[, maleEst := sapply(male, function(s) { strsplit(gsub(&quot;[\\]\\[\\-]&quot;, &quot; &quot;, s, perl = TRUE), 
+                                                      &quot;[ \t]+&quot;)[[1]][1] }, USE.NAMES = FALSE)]
+gluc[, maleMin := sapply(male, function(s) { strsplit(gsub(&quot;[\\]\\[\\-]&quot;, &quot; &quot;, s, perl = TRUE), 
+                                                      &quot;[ \t]+&quot;)[[1]][2] }, USE.NAMES = FALSE)]
+gluc[, maleMax := sapply(male, function(s) { strsplit(gsub(&quot;[\\]\\[\\-]&quot;, &quot; &quot;, s, perl = TRUE), 
+                                                      &quot;[ \t]+&quot;)[[1]][3] }, USE.NAMES = FALSE)]
+
+gluc[, femaleEst := sapply(female, function(s) { strsplit(gsub(&quot;[\\]\\[\\-]&quot;, &quot; &quot;, s, perl = TRUE), 
+                                                      &quot;[ \t]+&quot;)[[1]][1] }, USE.NAMES = FALSE)]
+gluc[, femaleMin := sapply(female, function(s) { strsplit(gsub(&quot;[\\]\\[\\-]&quot;, &quot; &quot;, s, perl = TRUE), 
+                                                      &quot;[ \t]+&quot;)[[1]][2] }, USE.NAMES = FALSE)]
+gluc[, femaleMax := sapply(female, function(s) { strsplit(gsub(&quot;[\\]\\[\\-]&quot;, &quot; &quot;, s, perl = TRUE), 
+                                                      &quot;[ \t]+&quot;)[[1]][3] }, USE.NAMES = FALSE)]
+
+gluc[, bothEst := sapply(both, function(s) { strsplit(gsub(&quot;[\\]\\[\\-]&quot;, &quot; &quot;, s, perl = TRUE), 
+                                                      &quot;[ \t]+&quot;)[[1]][1] }, USE.NAMES = FALSE)]
+gluc[, bothMin := sapply(both, function(s) { strsplit(gsub(&quot;[\\]\\[\\-]&quot;, &quot; &quot;, s, perl = TRUE), 
+                                                      &quot;[ \t]+&quot;)[[1]][2] }, USE.NAMES = FALSE)]
+gluc[, bothMax := sapply(both, function(s) { strsplit(gsub(&quot;[\\]\\[\\-]&quot;, &quot; &quot;, s, perl = TRUE), 
+                                                      &quot;[ \t]+&quot;)[[1]][3] }, USE.NAMES = FALSE)]
+
+gluc[, male := NULL]
+gluc[, female := NULL]
+gluc[, both := NULL]</code></pre>
 </div>
 
 
