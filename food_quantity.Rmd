@@ -1,0 +1,85 @@
+---
+title: "Food Supply"
+author: "Ivan Lysiuchenko"
+date: "October 19, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+Load the dataset:
+
+```{r}
+library(data.table)
+library(reshape2)
+foodBalance <- fread("materials/FoodBalanceSheets_E_All_Data.csv")
+```
+
+```{r echo=FALSE}
+targetElement <- unique(foodBalance[`Element Code` == 645, Element])
+```
+
+We are only interested in the element called *`r sprintf("\"%s\"", targetElement)`*. Also we need the data
+on separate countries rather than regions or groups of countries.
+
+```{r}
+foodBalance <- foodBalance[`Element Code` == 645 & `Area Code` < 1000]
+itemCodes <- foodBalance[, .(`Item Code`, Item)][, .SD[1], by = .(`Item Code`)]
+
+# How to compute 'leaders'
+#itemCodes[grep("vegetables", itemCodes$Item, ignore.case = TRUE)]
+#vegetableLeaders <- foodBalance[`Item Code` == 2918, .(`Area Code`, Area, Y2013)][order(-Y2013)]
+```
+
+```{r}
+gluc <- fread("materials/NCD_GLUC_03.csv")
+
+# Reflect the year and sex in column names to further melt the data set
+for (i in 2:ncol(gluc))
+    names(gluc)[i] <- sprintf("Y%d %s", as.integer(gluc[1, ..i]), trimws(gluc[4, ..i], "both"))
+
+# Remove unnecessary rows
+gluc <- gluc[-(1:4)]
+
+gluc <- melt(gluc, id.vars = c("V1"), measure.vars = names(gluc)[2:ncol(gluc)], 
+             variable.name = "yearSex", value.name = "percentage")
+setnames(gluc, old = "V1", new = "country")
+
+gluc[, year := sapply(X = yearSex, FUN = function(s) { regmatches(s, regexec("Y([0-9]{4})", s))[[1]][2] }, USE.NAMES = FALSE)]
+gluc[, sex := sapply(X = yearSex, FUN = function(s) { 
+    regmatches(tolower(s), regexec("(male|female|both)", tolower(s)))[[1]][2] }, USE.NAMES = FALSE)]
+gluc[, yearSex := NULL]
+
+gluc <- dcast.data.table(gluc, country + year ~ sex, value.var = "percentage")
+
+#strsplit(gsub("[\\]\\[\\-]", " ", gluc[1, both], perl = TRUE), "[ \t]+")[[1]]
+
+gluc[, maleEst := sapply(male, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][1] }, USE.NAMES = FALSE)]
+gluc[, maleMin := sapply(male, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][2] }, USE.NAMES = FALSE)]
+gluc[, maleMax := sapply(male, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][3] }, USE.NAMES = FALSE)]
+
+gluc[, femaleEst := sapply(female, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][1] }, USE.NAMES = FALSE)]
+gluc[, femaleMin := sapply(female, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][2] }, USE.NAMES = FALSE)]
+gluc[, femaleMax := sapply(female, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][3] }, USE.NAMES = FALSE)]
+
+gluc[, bothEst := sapply(both, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][1] }, USE.NAMES = FALSE)]
+gluc[, bothMin := sapply(both, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][2] }, USE.NAMES = FALSE)]
+gluc[, bothMax := sapply(both, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][3] }, USE.NAMES = FALSE)]
+
+gluc[, male := NULL]
+gluc[, female := NULL]
+gluc[, both := NULL]
+```
