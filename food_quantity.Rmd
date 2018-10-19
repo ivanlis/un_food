@@ -16,7 +16,7 @@ Load the dataset:
 ```{r message=FALSE}
 library(data.table)
 library(reshape2)
-foodBalance <- fread("materials/FoodBalanceSheets_E_All_Data.csv")
+foodBalance <- fread("materials/FoodBalanceSheets_E_All_Data.csv", encoding = "Latin-1")
 ```
 
 ```{r echo=FALSE}
@@ -28,7 +28,6 @@ on separate countries rather than regions or groups of countries.
 
 ```{r}
 foodBalance <- foodBalance[`Element Code` == 645 & `Area Code` < 1000]
-itemCodes <- foodBalance[, .(`Item Code`, Item)][, .SD[1], by = .(`Item Code`)]
 
 # How to compute 'leaders'
 #itemCodes[grep("vegetables", itemCodes$Item, ignore.case = TRUE)]
@@ -45,8 +44,8 @@ foodBalance <- melt(foodBalance, id.vars = c("areaCode", "area", "itemCode", "it
 foodBalance[, year := sapply(X = year, FUN = function(s) { regmatches(s, regexec("Y([0-9]{4})", s))[[1]][2] }, USE.NAMES = FALSE)]
 ```
 
-```{r}
-gluc <- fread("materials/NCD_GLUC_03.csv")
+```{r warning=FALSE, message=FALSE}
+gluc <- fread("materials/NCD_GLUC_03.csv", na.strings = "No data")
 
 # Reflect the year and sex in column names to further melt the data set
 for (i in 2:ncol(gluc))
@@ -68,28 +67,37 @@ gluc <- dcast.data.table(gluc, country + year ~ sex, value.var = "percentage")
 
 #strsplit(gsub("[\\]\\[\\-]", " ", gluc[1, both], perl = TRUE), "[ \t]+")[[1]]
 
-gluc[, maleEst := sapply(male, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
-                                                      "[ \t]+")[[1]][1] }, USE.NAMES = FALSE)]
-gluc[, maleMin := sapply(male, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
-                                                      "[ \t]+")[[1]][2] }, USE.NAMES = FALSE)]
-gluc[, maleMax := sapply(male, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
-                                                      "[ \t]+")[[1]][3] }, USE.NAMES = FALSE)]
+gluc[, maleEst := as.numeric(sapply(male, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][1] }, USE.NAMES = FALSE))]
+gluc[, maleMin := as.numeric(sapply(male, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][2] }, USE.NAMES = FALSE))]
+gluc[, maleMax := as.numeric(sapply(male, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][3] }, USE.NAMES = FALSE))]
 
-gluc[, femaleEst := sapply(female, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
-                                                      "[ \t]+")[[1]][1] }, USE.NAMES = FALSE)]
-gluc[, femaleMin := sapply(female, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
-                                                      "[ \t]+")[[1]][2] }, USE.NAMES = FALSE)]
-gluc[, femaleMax := sapply(female, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
-                                                      "[ \t]+")[[1]][3] }, USE.NAMES = FALSE)]
+gluc[, femaleEst := as.numeric(sapply(female, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][1] }, USE.NAMES = FALSE))]
+gluc[, femaleMin := as.numeric(sapply(female, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][2] }, USE.NAMES = FALSE))]
+gluc[, femaleMax := as.numeric(sapply(female, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][3] }, USE.NAMES = FALSE))]
 
-gluc[, bothEst := sapply(both, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
-                                                      "[ \t]+")[[1]][1] }, USE.NAMES = FALSE)]
-gluc[, bothMin := sapply(both, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
-                                                      "[ \t]+")[[1]][2] }, USE.NAMES = FALSE)]
-gluc[, bothMax := sapply(both, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
-                                                      "[ \t]+")[[1]][3] }, USE.NAMES = FALSE)]
+gluc[, bothEst := as.numeric(sapply(both, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][1] }, USE.NAMES = FALSE))]
+gluc[, bothMin := as.numeric(sapply(both, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][2] }, USE.NAMES = FALSE))]
+gluc[, bothMax := as.numeric(sapply(both, function(s) { strsplit(gsub("[\\]\\[\\-]", " ", s, perl = TRUE), 
+                                                      "[ \t]+")[[1]][3] }, USE.NAMES = FALSE))]
 
 gluc[, male := NULL]
 gluc[, female := NULL]
 gluc[, both := NULL]
+```
+
+
+```{r}
+gluc2014 <- gluc[year == 2014 & !is.na(bothEst), .(country, bothEst, bothMin, bothMax)]
+foodBalance <- foodBalance[, .(meanAmount = mean(amount)), by = .(areaCode, area, itemCode, item)]
+
+mergedTable <- merge(foodBalance, gluc2014, by.x = "area", by.y = "country")
+itemCodes <- foodBalance[, .(itemCode, item)][, .SD[1], by = .(itemCode)]
 ```
